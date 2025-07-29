@@ -1,5 +1,4 @@
 Flask==2.3.3
-PyMuPDF==1.23.7
 langchain==0.3.27
 langchain-community==0.3.27
 langchain-core==0.3.72
@@ -8,3 +7,4 @@ langsmith==0.4.8
 google-generativeai==0.3.2
 sentence-transformers==2.6.1
 faiss-cpu==1.7.4
+PyMuPDF==1.21.1
