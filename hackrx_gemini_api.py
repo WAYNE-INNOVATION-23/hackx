@@ -1,7 +1,7 @@
 # hackrx_gemini_api.py
 
 import os
-import fitz  # PyMuPDF
+import pdfplumber
 import json
 from flask import Flask, request, jsonify
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -18,9 +18,10 @@ PDF_PATH = "BAJHLIP23020V012223.pdf"  # Place this in your Render project root
 
 # Step 1: Load PDF and Build FAISS Index
 def load_and_index_pdf(pdf_path):
-    doc = fitz.open(pdf_path)
-    full_text = "\n".join([page.get_text() for page in doc])
-    doc.close()
+    full_text = ""
+    with pdfplumber.open(pdf_path) as pdf:
+        for page in pdf.pages:
+            full_text += page.extract_text() + "\n"
 
     splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
     chunks = splitter.split_text(full_text)
@@ -28,6 +29,7 @@ def load_and_index_pdf(pdf_path):
     embeddings = HuggingFaceBgeEmbeddings(model_name="BAAI/bge-small-en-v1.5")
     db = FAISS.from_texts(chunks, embeddings)
     return db
+
 
 db = load_and_index_pdf(PDF_PATH)
 
