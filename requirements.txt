@@ -7,4 +7,5 @@ langsmith==0.4.8
 google-generativeai==0.3.2
 sentence-transformers==2.6.1
 faiss-cpu==1.7.4
-PyMuPDF==1.21.1
+pdfplumber==0.10.2
+
