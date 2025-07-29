@@ -6,7 +6,7 @@ import json
 from flask import Flask, request, jsonify
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceBgeEmbeddings
-from langchain_community.vectorstores import FAISS
+from langchain_community.vectorstores import Chroma
 import google.generativeai as genai
 
 # Setup Gemini with your actual API key
@@ -27,7 +27,9 @@ def load_and_index_pdf(pdf_path):
     chunks = splitter.split_text(full_text)
 
     embeddings = HuggingFaceBgeEmbeddings(model_name="BAAI/bge-small-en-v1.5")
-    db = FAISS.from_texts(chunks, embeddings)
+    db = Chroma.from_texts(chunks, embedding=embeddings, persist_directory="chroma_db")
+    db.persist()  # Saves the vector DB to disk (good for Render persistence)
+
     return db
 
 
