@@ -1,86 +1,69 @@
-import os
+from flask import Flask, request, jsonify
 import requests
 import fitz  # PyMuPDF
-from flask import Flask, request, jsonify
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_community.vectorstores import FAISS
 import google.generativeai as genai
-
-# ✅ Load environment variables
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-model = genai.GenerativeModel("models/gemini-1.5-flash")
+from sentence_transformers import SentenceTransformer
+import os
 
 app = Flask(__name__)
 
-# ✅ Function to load PDF from URL (including Azure Blob)
-def load_pdf_from_url(url):
-    response = requests.get(url)
-    if response.status_code != 200:
-        raise ValueError("Failed to download PDF from URL")
-    
-    with open("temp.pdf", "wb") as f:
-        f.write(response.content)
+# Load Sentence Transformer model
+model = SentenceTransformer("all-MiniLM-L6-v2")
 
-    doc = fitz.open("temp.pdf")
-    full_text = "\n".join([page.get_text() for page in doc])
-    doc.close()
-    return full_text
+# Configure Gemini API
+genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
-# ✅ Text splitting + vector indexing
-def build_vectorstore(text):
-    splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-    chunks = splitter.split_text(text)
-
-    embeddings = HuggingFaceEmbeddings(model_name="BAAI/bge-small-en-v1.5")
-    db = FAISS.from_texts(chunks, embedding=embeddings)
-    return db
-
-@app.route("/hackrx/run", methods=["POST"])
-def hackrx_run():
-    if request.headers.get("Authorization") != f"Bearer {os.getenv('HACKRX_API_KEY')}":
-        return jsonify({"error": "Unauthorized"}), 401
-
-    data = request.get_json()
-    url = data.get("documents")
-    questions = data.get("questions", [])
-    
+@app.route('/hackrx/run', methods=['POST'])
+def run():
     try:
-        pdf_text = load_pdf_from_url(url)
-        db = build_vectorstore(pdf_text)
-    except Exception as e:
-        return jsonify({"error": f"PDF processing failed: {str(e)}"}), 400
+        # Validate Authorization header
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return jsonify({'error': 'Missing or invalid Authorization header'}), 401
 
-    answers = []
-    for question in questions:
-        docs = db.similarity_search(question, k=3)
-        context = "\n\n".join([doc.page_content for doc in docs])
-        
-        prompt = f"""
-You are a healthcare policy expert helping users understand their insurance documents.
+        # Load request data
+        data = request.get_json()
+        pdf_url = data.get("documents")
+        questions = data.get("questions", [])
 
-Context:
-{context}
+        if not pdf_url or not questions:
+            return jsonify({'error': 'Missing PDF URL or questions'}), 400
 
-Question:
-{question}
+        # Download the PDF
+        response = requests.get(pdf_url)
+        if response.status_code != 200:
+            return jsonify({'error': 'Failed to download PDF'}), 400
 
-Instructions:
-- Provide a clear, concise answer.
-- If the information is not available in the context, say "Not specified in the document."
-- Avoid assumptions or generalizations.
-- Keep the answer within 1-2 sentences.
-- Respond only with the answer to the question.
+        pdf_path = "temp.pdf"
+        with open(pdf_path, 'wb') as f:
+            f.write(response.content)
 
+        # Extract text from PDF
+        doc = fitz.open(pdf_path)
+        full_text = "\n".join([page.get_text() for page in doc])
+        doc.close()
+
+        # Initialize Gemini model
+        model_gemini = genai.GenerativeModel('gemini-pro')
+
+        # Process questions
+        answers = []
+        for question in questions:
+            prompt = f"""Based on the following insurance policy document, answer the question:
+
+Document:
+{full_text}
+
+Question: {question}
 Answer:"""
 
-        try:
-            response = model.generate_content(prompt)
-            answers.append(response.text.strip())
-        except Exception as e:
-            answers.append("Error: " + str(e))
+            gemini_response = model_gemini.generate_content(prompt)
+            answers.append(gemini_response.text.strip())
 
-    return jsonify({"answers": answers})
+        return jsonify({'answers': answers})
 
-if __name__ == "__main__":
-    app.run(debug=False, host="0.0.0.0", port=5000)
+    except Exception as e:
+        return jsonify({'error': f'PDF processing failed: {str(e)}'}), 500
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
