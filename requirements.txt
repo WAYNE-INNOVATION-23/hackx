@@ -2,6 +2,7 @@ Flask
 PyMuPDF
 requests
 google-generativeai
+sentence-transformers
 langchain
 langchain-core
 langchain-community
