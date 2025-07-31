@@ -13,6 +13,24 @@ genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 # Initialize Gemini model
 gemini_model = genai.GenerativeModel("models/gemini-2.0-flash")
 
+# Function to extract relevant chunks based on keywords in the question
+def get_relevant_chunks(text, question, max_len=2000):
+    chunks = text.split('\n\n')
+    question_keywords = set(question.lower().split())
+
+    filtered_chunks = []
+    total_length = 0
+    for chunk in chunks:
+        if any(word in chunk.lower() for word in question_keywords):
+            filtered_chunks.append(chunk.strip())
+            total_length += len(chunk)
+            if total_length >= max_len:
+                break
+
+    if not filtered_chunks:
+        return text[:max_len]  # fallback to start of doc if no matches
+    return "\n".join(filtered_chunks)
+
 @app.route('/hackrx/run', methods=['POST'])
 def run():
     try:
@@ -36,25 +54,25 @@ def run():
         with open("temp.pdf", "wb") as f:
             f.write(pdf_response.content)
 
-        # Extract text using PyMuPDF
+        # Extract text using PyMuPDF (limit to first 6 pages)
         doc = fitz.open("temp.pdf")
-        full_text = "\n".join([page.get_text() for page in doc])
+        full_text = "\n".join([page.get_text() for page in doc[:6]])
         doc.close()
 
         if not full_text.strip():
             return jsonify({'error': 'No text extracted from PDF'}), 400
 
-        # Start total timing
+        # Start timing
         total_start = time.time()
 
-        # Answer each question
+        # Generate answers
         answers = []
         for question in questions:
-            prompt = f"""
-You are a precise assistant. Based only on the policy text, give a short and direct answer (1-2 lines max) to the question.
+            context = get_relevant_chunks(full_text, question)
+            prompt = f"""You are a concise assistant. Based only on the insurance document below, answer the question in one or two short sentences. Do not add explanations.
 
 ---DOCUMENT---
-{full_text}
+{context}
 
 ---QUESTION---
 {question}
@@ -67,18 +85,17 @@ You are a precise assistant. Based only on the policy text, give a short and dir
                 answer = f"Error: {str(e)}"
             answers.append(answer)
 
-        # End total timing
         total_end = time.time()
-        total_time = round(total_end - total_start, 2)
+        response_time = round(total_end - total_start, 2)
 
         return jsonify({
             "answers": "\n".join(answers),
-            "total_response_time_sec": total_time
+            "total_response_time_sec": response_time
         })
 
     except Exception as e:
         return jsonify({'error': f"Server error: {str(e)}"}), 500
 
-# Required for Render
+# For Render
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
