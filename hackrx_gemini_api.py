@@ -10,7 +10,7 @@ app = Flask(__name__)
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
 # Initialize Gemini model
-gemini_model = genai.GenerativeModel("models/gemini-1.5-flash"")
+gemini_model = genai.GenerativeModel("models/gemini-1.5-flash")
 
 @app.route('/hackrx/run', methods=['POST'])
 def run():
