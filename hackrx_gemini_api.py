@@ -3,6 +3,7 @@ import requests
 import fitz  # PyMuPDF
 import google.generativeai as genai
 import os
+import time
 
 app = Flask(__name__)
 
@@ -43,21 +44,40 @@ def run():
         if not full_text.strip():
             return jsonify({'error': 'No text extracted from PDF'}), 400
 
-        # Answer each question using Gemini
+        # Start total timing
+        total_start = time.time()
+
+        # Answer each question
         answers = []
         for question in questions:
-            prompt = f"Answer the question based on the insurance policy document below:\n\n{full_text}\n\nQuestion: {question}\nAnswer:"
+            prompt = f"""
+You are a precise assistant. Based only on the policy text, give a short and direct answer (1-2 lines max) to the question.
+
+---DOCUMENT---
+{full_text}
+
+---QUESTION---
+{question}
+
+---ANSWER---"""
             try:
                 result = gemini_model.generate_content(prompt)
                 answer = result.text.strip()
             except Exception as e:
-                answer = f"Error generating answer: {str(e)}"
+                answer = f"Error: {str(e)}"
             answers.append(answer)
 
-        return jsonify({"answers": answers})
+        # End total timing
+        total_end = time.time()
+        total_time = round(total_end - total_start, 2)
+
+        return jsonify({
+            "answers": "\n".join(answers),
+            "total_response_time_sec": total_time
+        })
 
     except Exception as e:
-        return jsonify({"error": f"Server error: {str(e)}"}), 500
+        return jsonify({'error': f"Server error: {str(e)}"}), 500
 
 # Required for Render
 if __name__ == "__main__":
