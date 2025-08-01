@@ -57,7 +57,7 @@ def run():
         answers = []
         for question in questions:
             prompt = f"""
-You are a precise assistant. Based only on the policy text, give a short and direct answer (1-2 lines max) to the question.
+You are a smart insurance assistant. Based only on the insurance policy document below, give a direct, short answer (1–2 lines) to the question, written in simple, understandable language. Avoid legal wording and long definitions.
 
 ---DOCUMENT---
 {full_text}
@@ -86,4 +86,5 @@ You are a precise assistant. Based only on the policy text, give a short and dir
 # Required for Render
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+
 
