@@ -76,7 +76,7 @@ You are a precise assistant. Based only on the policy text, give a short and dir
         total_time = round(time.time() - start_time, 2)
 
         return jsonify({
-            "answers": "\n".join(answers),
+            "answers": answers,
             "total_response_time_sec": total_time
         })
 
@@ -86,3 +86,4 @@ You are a precise assistant. Based only on the policy text, give a short and dir
 # Required for Render
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+
